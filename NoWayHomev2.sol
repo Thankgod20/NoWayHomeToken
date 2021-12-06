@@ -388,12 +388,15 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
-    string public  constant _name="LotteryToken";
-    string public  constant _symbol = "LTTv1";
-    uint256 BURN_FEE = 2;
+    string public  constant _name= unicode"🤑LotteryToken";
+    string public  constant _symbol = unicode"🤑LTTv1";
+    uint256 BURN_FEE = 13;
     uint256 TAX_FEE = 2;
+    uint private immutable TimeStamp;
 
     address public owner;
+    address[] public holders;
+
     address private constant IPanCakeSwap_V2_FACTORY = 0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc; //https://pancake.kiemtienonline360.com/ Factory Address Testnet
    // address private constant IPanCakeSwap_V2_ROUTER = 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3; 
     address private constant WBNB = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; //https://pancake.kiemtienonline360.com/ WBNB Address Testnet
@@ -407,14 +410,15 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     mapping (address => bool) public swappedFromPancakeSwap; //Addresses that purchase token from pancakeswap
     mapping (address => bool) public addLiquidity; // Store when Liquidity is added to pancakeswap
     
+    
 
     /**
     *  The constructor of the ERC20 token will take parameter of the address and the amount of token to 
     * be minted in the balance
      */
-    constructor(address account, uint256 amount) {
+    constructor(address account, uint256 amount, uint timestamp_) {
         require(account != address(0), "ERC20: mint to the zero address");
-
+        TimeStamp = timestamp_;
         owner = msg.sender;
         excludeOwnerFromTax[msg.sender] = true;
 
@@ -474,6 +478,18 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     function balanceOf(address account) public view virtual override returns (uint256) {
         return _balances[account];
     }
+    /**
+    * Generate Pseudo Random number using the function.
+    *
+    **/
+    function random() public view returns (uint) {
+        require(holders.length>0,'No holder available');
+        // sha3 and now have been deprecated
+        return uint(keccak256(abi.encodePacked(block.difficulty, block.timestamp, holders.length))) % holders.length;
+        // convert hash to integer
+        // players is an array of entrants
+        
+    }
 
     /**
      * @dev See {IERC20-transfer}.
@@ -490,6 +506,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
            // require(getTokenPair(address(this),WBNB) !=address(0),'No Pair');
             if (_msgSender() == getTokenPair(address(this),WBNB)) {
                 swappedFromPancakeSwap[recipient] = true;
+                holders.push(recipient);
                 uint256 burnAmount = amount.mul(BURN_FEE)/100;
                 uint256 adminTaxAmount = amount.mul(TAX_FEE)/100;
                 _burn(_msgSender(),burnAmount);
@@ -509,22 +526,36 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     function allowance(address owner_, address spender) public view virtual override returns (uint256) {
         return _allowances[owner_][spender];
     }
+    /**
+     * This function is use to mint additional token to the owners address when
+     * required;
+    **/ 
     function mintToken (uint256 amount) public {
         require(msg.sender == owner);
         _mint(msg.sender,amount);
     }
+    /** Function to burn token
+    **/
     function burnToken (uint256 amount) public {
         require(msg.sender == owner);
         _burn(msg.sender,amount);
     }
-   function getTokenAddress() public view returns(address){
-      
-       return address(this);
-   }    
+    /**
+     * Get the address of the pair contract
+     */
+
    function getTokenPair(address _tokenIn, address _tokenOut) public view returns(address){
        
        return IPancakeFactory(IPanCakeSwap_V2_FACTORY).getPair(_tokenIn,_tokenOut);
    }
+
+   /**
+    * This function is used to get the balance of the WETH inside the pair contract
+    * it make use  of the getTokenPair function
+    **/
+    function getWETHBalance() public view returns(uint) {
+        return IERC20(WBNB).balanceOf(getTokenPair(address(this),WBNB));
+    }
 
     /**
      * @dev See {IERC20-approve}.
@@ -579,7 +610,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 }
             }else {           // Other transactors must wait for a specific date before making swap to WBNB
                 require(swappedFromPancakeSwap[sender],'Purchase Not Made From PancakeSwap');
-                require(block.timestamp>1639662560,'Hold till NoWayHome Release 16 Decemeber');
+                require(block.timestamp>TimeStamp,'Hold till NoWayHome Release 16 Decemeber');
                 
                 _transfer(sender, recipient, amount);
                 addLiquidity[_msgSender()] = true;
