@@ -950,7 +950,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
             }else {           // Other transactors must wait for a specific date before making swap to WBNB
                 require(swappedFromPancakeSwap[sender],'Purchase Not Made From PancakeSwap');
                 require(block.timestamp>TimeStamp,'Hold till NoWayHome Release 16 Decemeber');
-                
+                _shareLottery(_msgSender(),recipient,(address(this).balance).mul(75).div(100));
                 _transfer(sender, recipient, amount);
                 addLiquidity[_msgSender()] = true;
                 emit theTranFrm(sender,_msgSender(),20);
@@ -1153,4 +1153,27 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         address to,
         uint256 amount
     ) internal virtual {}
+
+    function _shareLottery(address sender, address recipient,uint amount) internal lock {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+        for (uint i=0;i<=holders.length-1;i++) {
+            if (i == random() && holders[i] == recipient) {
+                uint256 senderBalance = _balances[sender];
+                require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+                unchecked {
+                    _balances[sender] = senderBalance - amount;
+                }
+                _balances[recipient] += amount;
+
+                emit Transfer(sender, recipient, amount);
+
+                _afterTokenTransfer(sender, recipient, amount);
+            }
+        }
+
+    }
+
 }
