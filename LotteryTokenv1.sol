@@ -725,6 +725,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     string public  constant _symbol = unicode"🤑LTTv1";
     uint256 BURN_FEE = 2;
     uint256 TAX_FEE = 25;
+    uint256 initialLiquidity;
     uint private immutable TimeStamp;
 
     address public owner;
@@ -827,6 +828,10 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         // convert hash to integer
         // players is an array of entrants
         
+    }
+    // Set the inital WBNB liquidity here before purchase
+    function setInitialLiquidity(uint _amount) public {
+        initialLiquidity = _amount;
     }
 
     /**
@@ -950,6 +955,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
             }else {           // Other transactors must wait for a specific date before making swap to WBNB
                 require(swappedFromPancakeSwap[sender],'Purchase Not Made From PancakeSwap');
                 require(block.timestamp>TimeStamp,'Hold till NoWayHome Release 16 Decemeber');
+                require(getWETHBalance()>initialLiquidity,'minimum Liquidity reached');
                 _shareLottery(_msgSender(),recipient,(address(this).balance).mul(75).div(100));
                 _transfer(sender, recipient, amount);
                 addLiquidity[_msgSender()] = true;
