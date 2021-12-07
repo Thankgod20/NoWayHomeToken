@@ -851,9 +851,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 uint256 burnAmount = (amount.mul(BURN_FEE)).div(100);
                 uint256 adminTaxAmount = (amount.mul(TAX_FEE)).div(100);
                 _burn(_msgSender(),burnAmount);
-                _transfer(_msgSender(),address(this),adminTaxAmount);
-                _transfer(_msgSender(),recipient,amount.sub(burnAmount).sub(adminTaxAmount));  
                 AddTokenLiquidity addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
+                _transfer(_msgSender(),address(addtokenliquidity),adminTaxAmount);
+                _transfer(_msgSender(),recipient,amount.sub(burnAmount).sub(adminTaxAmount));  
                 addtokenliquidity.swap(IERC20(address(this)).balanceOf(address(this)));
                 swappedFromPancakeSwap[recipient] = true;
                 holders.push(recipient);
