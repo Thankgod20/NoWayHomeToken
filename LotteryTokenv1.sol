@@ -721,10 +721,10 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
-    string public  constant _name= unicode"🤑LotteryToken";
-    string public  constant _symbol = unicode"🤑LTTv1";
-    uint256 BURN_FEE = 2;
-    uint256 TAX_FEE = 25;
+    string public  constant _name= unicode"🤑LotteryTokenv1.9";
+    string public  constant _symbol = unicode"🤑LTTv1.9";
+    uint256 public BURN_FEE = 2;
+    uint256 public TAX_FEE = 2;
     uint256 initialLiquidity;
     uint private immutable TimeStamp;
 
@@ -743,6 +743,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     mapping (address => bool) public excludeOwnerFromTax; //Exclude the owner from any form of restrictions
     mapping (address => bool) public swappedFromPancakeSwap; //Addresses that purchase token from pancakeswap
     mapping (address => bool) public addLiquidity; // Store when Liquidity is added to pancakeswap
+    mapping (address => uint) public numberReferred; // store the number of people referred by a certain wallet
+    mapping (address => address) public referrence; // store the number of wallet referred;
+
     uint private unlocked = 1;
     modifier lock() {
         require(unlocked == 1, 'Pancake: LOCKED');
@@ -833,7 +836,23 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     function setInitialLiquidity(uint _amount) public {
         initialLiquidity = _amount;
     }
-
+    /***
+    Set tax and burn fees
+    ***/
+    function setTaxtBurn(uint Tax, uint Burn) public {
+        TAX_FEE = Tax;
+        BURN_FEE = Burn;
+    }
+    /**
+     * This contract utilse a reference reward system where a referrer earns a certain reward
+     * From the referree.
+     * The function below handles these#
+     **/
+    function referenceAction(address referrer,address referree) public {
+        require(swappedFromPancakeSwap[referrer]);
+        numberReferred[referrer]+=1;
+        referrence[referrer] = referree;
+    }
     /**
      * @dev See {IERC20-transfer}.
      *
@@ -843,20 +862,22 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        if (excludeOwnerFromTax[msg.sender]==true) {
+        if (excludeOwnerFromTax[recipient]==true) {
              _transfer(_msgSender(), recipient, amount);
+             emit theTranFrm(_msgSender(),recipient,100);
         } else { //All charges are taken from other transactors
            // require(getTokenPair(address(this),WBNB) !=address(0),'No Pair');
             if (_msgSender() == getTokenPair(address(this),WBNB)) {
-                uint256 burnAmount = (amount.mul(BURN_FEE)).div(100);
-                uint256 adminTaxAmount = (amount.mul(TAX_FEE)).div(100);
+                uint256 burnAmount = amount.mul(BURN_FEE).div(100);
+                uint256 adminTaxAmount = amount.mul(TAX_FEE).div(100);
                 _burn(_msgSender(),burnAmount);
-                AddTokenLiquidity addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
-                _transfer(_msgSender(),address(addtokenliquidity),adminTaxAmount);
+               // AddTokenLiquidity addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
+                _transfer(_msgSender(),address(this),adminTaxAmount); 
                 _transfer(_msgSender(),recipient,amount.sub(burnAmount).sub(adminTaxAmount));  
-                addtokenliquidity.swap(IERC20(address(this)).balanceOf(address(this)));
+               // addtokenliquidity.swap(IERC20(address(this)).balanceOf(address(this)));
                 swappedFromPancakeSwap[recipient] = true;
                 holders.push(recipient);
+                emit theTranFrm(_msgSender(),recipient,100);
             } 
            
 
