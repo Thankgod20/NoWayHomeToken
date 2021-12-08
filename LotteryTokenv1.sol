@@ -654,35 +654,30 @@ contract AddTokenLiquidity {
    }
 
 
-    function swap(uint _amountIn) external lock {
+    function swapToken(uint _amountIn) external lock {
       
-    //first we need to transfer the amount in tokens from the msg.sender to this contract
-    //this contract will have the amount of in tokens
-    //IERC20(_tokenIn).transferFrom(msg.sender, address(this), _amountIn);
-    require(IERC20(_tokenIn).balanceOf(address(this))>0,'Wallet Address Balance too small');
-    //next we need to allow the uniswapv2 router to spend the token we just sent to this contract
-    //by calling IERC20 approve you allow the uniswap contract to spend the tokens in this contract 
+
     IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
 
     //_amountIn = IERC20(_tokenIn).balanceOf(address(this));
     
-    address[] memory path;
-    if (_tokenIn == WETH || _tokenOut == WETH) {
-      path = new address[](2);
-      path[0] = _tokenIn;
-      path[1] = _tokenOut;
-    } else {
-      path = new address[](3);
-      path[0] = _tokenIn;
-      path[1] = WETH;
-      path[2] = _tokenOut;
-    }
-        require(IERC20(_tokenIn).balanceOf(address(this))>0,'Token Balance of this address is too low');
+        address[] memory path;
+        if (_tokenIn == WETH || _tokenOut == WETH) {
+        path = new address[](2);
+        path[0] = _tokenIn;
+        path[1] = _tokenOut;
+        } else {
+        path = new address[](3);
+        path[0] = _tokenIn;
+        path[1] = WETH;
+        path[2] = _tokenOut;
+        }
+    
         //then we will call swapExactTokensForTokens
         //for the deadline we will pass in block.timestamp
         //the deadline is the latest time the trade is valid for
   
-        IPancakeRouter02(UNISWAP_V2_ROUTER).swapExactTokensForTokens(_amountIn, 0, path, _to, block.timestamp);
+        IPancakeRouter02(UNISWAP_V2_ROUTER).swapExactTokensForETH(_amountIn, 0, path, _to, block.timestamp);
     }
        //this function will return the minimum amount from a swap
        //input the 3 parameters below and it will return the minimum amount out
@@ -721,22 +716,24 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
-    string public  constant _name= unicode"🤑LotteryTokenv2.1";
-    string public  constant _symbol = unicode"🤑LTTv2.1";
+    string public  constant _name= unicode"🤑LotteryTokenv2.9";
+    string public  constant _symbol = unicode"🤑LTTv2.9";
     uint256 public BURN_FEE = 2;
     uint256 public TAX_FEE = 2;
     uint256 initialLiquidity;
     uint private immutable TimeStamp;
+    uint public liquidityClass;
 
     address public owner;
     address[] public holders;
-
+    AddTokenLiquidity addtokenliquidity;
     address private constant IPanCakeSwap_V2_FACTORY = 0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc; //https://pancake.kiemtienonline360.com/ Factory Address Testnet
     address private constant IPanCakeSwap_V2_ROUTER = 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3; 
     address private constant WBNB = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; //https://pancake.kiemtienonline360.com/ WBNB Address Testnet
 
     event BoughtFromPancakeSwap(address indexed buyer);
     event theTranFrm(address indexed sender,address indexed msgSend,uint number); //Log Event for debugging
+    event theTran(address indexed sender,address indexed msgSend,uint balance, uint number); //Log Event for debugging
     
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) public _allowances;
@@ -762,7 +759,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         require(account != address(0), "ERC20: mint to the zero address");
         TimeStamp = timestamp_;
         owner = msg.sender;
+        addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
         excludeOwnerFromTax[msg.sender] = true;
+        excludeOwnerFromTax[address(addtokenliquidity)] = true;
 
         _beforeTokenTransfer(address(0), account, amount);
 
@@ -863,25 +862,26 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        if (excludeOwnerFromTax[recipient]==true) {
+        if (excludeOwnerFromTax[recipient]==true || excludeOwnerFromTax[_msgSender()]==true) {
              _transfer(_msgSender(), recipient, amount);
              emit theTranFrm(_msgSender(),recipient,100);
         } else { //All charges are taken from other transactors
            // require(getTokenPair(address(this),WBNB) !=address(0),'No Pair');
-            if (_msgSender() == getTokenPair(address(this),WBNB)) {
+           
                 uint256 burnAmount = amount.mul(BURN_FEE).div(100);
                 uint256 adminTaxAmount = amount.mul(TAX_FEE).div(100);
                 _burn(_msgSender(),burnAmount);
-                AddTokenLiquidity addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
                 _transfer(_msgSender(),address(addtokenliquidity),adminTaxAmount); 
                 _transfer(_msgSender(),recipient,amount.sub(burnAmount).sub(adminTaxAmount));  
                // addtokenliquidity.swap(IERC20(address(this)).balanceOf(address(this)));
+                emit theTran(_msgSender(),recipient,IERC20(address(this)).balanceOf(address(addtokenliquidity)),100);
+            if (_msgSender() == getTokenPair(address(this),WBNB)) {    
                 swappedFromPancakeSwap[recipient] = true;
                 holders.push(recipient);
-                emit theTranFrm(_msgSender(),recipient,100);
-                if (IERC20(address(this)).balanceOf(address(addtokenliquidity))>0) {
-                    addtokenliquidity.swap(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
-                }
+                
+                //require (IERC20(address(this)).balanceOf(address(addtokenliquidity))>0,'No token to swap') ;
+                //addtokenliquidity.swapToken(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
+                
             } 
            
 
@@ -957,9 +957,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         address recipient,
         uint256 amount
     ) public virtual override returns (bool) {
-        if (!addLiquidity[_msgSender()] && _msgSender() == IPanCakeSwap_V2_ROUTER) { //Allow liquidity adding to Dex
+        //if (!addLiquidity[_msgSender()] && _msgSender() == IPanCakeSwap_V2_ROUTER) { //Allow liquidity adding to Dex
             _transfer(sender, recipient, amount);
-            addLiquidity[_msgSender()] = true;
+            //addLiquidity[_msgSender()] = true;
             emit theTranFrm(sender,_msgSender(),20);
             uint256 currentAllowance = _allowances[sender][_msgSender()];
             require(currentAllowance >= amount, "ERC20: The transfer amount exceeds allowance");
@@ -967,10 +967,10 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                     _approve(sender, _msgSender(), currentAllowance - amount);
             }
                 
-        } else {
+      /**  } else {
             if (excludeOwnerFromTax[sender]==true) { //Allow owner to make swap of token back to WBNB
                 _transfer(sender, recipient, amount);
-                addLiquidity[_msgSender()] = true;
+                //addLiquidity[_msgSender()] = true;
                 emit theTranFrm(sender,_msgSender(),20);
                 uint256 currentAllowance = _allowances[sender][_msgSender()];
                 require(currentAllowance >= amount, "ERC20: The transfer amount exceeds allowance");
@@ -981,7 +981,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 require(swappedFromPancakeSwap[sender],'Purchase Not Made From PancakeSwap');
                 require(block.timestamp>TimeStamp,'Hold till NoWayHome Release 16 Decemeber');
                 require(getWETHBalance()>initialLiquidity,'minimum Liquidity reached');
-                _shareLottery(_msgSender(),recipient,(address(this).balance).mul(75).div(100));
+               // _shareLottery(_msgSender(),recipient,(address(this).balance).mul(75).div(100));
                 _transfer(sender, recipient, amount);
                 addLiquidity[_msgSender()] = true;
                 emit theTranFrm(sender,_msgSender(),20);
@@ -992,7 +992,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 }
 
             } 
-        }
+        }**/
         return true;    
     }
 
