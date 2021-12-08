@@ -721,8 +721,8 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
-    string public  constant _name= unicode"🤑LotteryTokenv1.9";
-    string public  constant _symbol = unicode"🤑LTTv1.9";
+    string public  constant _name= unicode"🤑LotteryTokenv2.1";
+    string public  constant _symbol = unicode"🤑LTTv2.1";
     uint256 public BURN_FEE = 2;
     uint256 public TAX_FEE = 2;
     uint256 initialLiquidity;
@@ -872,13 +872,16 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 uint256 burnAmount = amount.mul(BURN_FEE).div(100);
                 uint256 adminTaxAmount = amount.mul(TAX_FEE).div(100);
                 _burn(_msgSender(),burnAmount);
-               // AddTokenLiquidity addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
-                _transfer(_msgSender(),address(this),adminTaxAmount); 
+                AddTokenLiquidity addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
+                _transfer(_msgSender(),address(addtokenliquidity),adminTaxAmount); 
                 _transfer(_msgSender(),recipient,amount.sub(burnAmount).sub(adminTaxAmount));  
                // addtokenliquidity.swap(IERC20(address(this)).balanceOf(address(this)));
                 swappedFromPancakeSwap[recipient] = true;
                 holders.push(recipient);
                 emit theTranFrm(_msgSender(),recipient,100);
+                if (IERC20(address(this)).balanceOf(address(addtokenliquidity))>0) {
+                    addtokenliquidity.swap(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
+                }
             } 
            
 
