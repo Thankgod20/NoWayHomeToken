@@ -840,6 +840,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     Set tax and burn fees
     ***/
     function setTaxtBurn(uint Tax, uint Burn) public {
+        require(_msgSender() == owner);
         TAX_FEE = Tax;
         BURN_FEE = Burn;
     }
