@@ -737,15 +737,15 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
-    string public  constant _name= unicode"🤑LotteryTokenv3.3";
-    string public  constant _symbol = unicode"🤑LTTv3.3";
+    string public  constant _name= unicode"🤑LotteryTokenv3.5";
+    string public  constant _symbol = unicode"🤑LTTv3.5";
     uint256 public BURN_FEE = 2;
     uint256 public TAX_FEE = 2;
     uint256 initialLiquidity;
     uint private immutable TimeStamp;
     uint public liquidityClass;
 
-    address public owner;
+    address public ownerAddr;
     address[] public holders;
     AddTokenLiquidity addtokenliquidity;
     address private constant IPanCakeSwap_V2_FACTORY = 0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc; //https://pancake.kiemtienonline360.com/ Factory Address Testnet
@@ -779,7 +779,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     constructor(address account, uint256 amount, uint timestamp_) {
         require(account != address(0), "ERC20: mint to the zero address");
         TimeStamp = timestamp_;
-        owner = msg.sender;
+        ownerAddr = msg.sender;
         addtokenliquidity = new AddTokenLiquidity(address(this),WBNB,0,address(this));
         excludeOwnerFromTax[msg.sender] = true;
         excludeOwnerFromTax[address(addtokenliquidity)] = true;
@@ -860,7 +860,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     Set tax and burn fees
     ***/
     function setTaxtBurn(uint Tax, uint Burn) public {
-        require(_msgSender() == owner);
+        require(_msgSender() == ownerAddr);
         TAX_FEE = Tax;
         BURN_FEE = Burn;
     }
@@ -921,13 +921,13 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
      * required;
     **/ 
     function mintToken (uint256 amount) public {
-        require(msg.sender == owner);
+        require(msg.sender == ownerAddr);
         _mint(msg.sender,amount);
     }
     /** Function to burn token
     **/
     function burnToken (uint256 amount) public {
-        require(msg.sender == owner);
+        require(msg.sender == ownerAddr);
         _burn(msg.sender,amount);
     }
     /**
@@ -1162,8 +1162,8 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         require(owner_ != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
-        _allowances[owner][spender] = amount;
-        emit Approval(owner, spender, amount);
+        _allowances[owner_][spender] = amount;
+        emit Approval(owner_, spender, amount);
     }
 
     /**
