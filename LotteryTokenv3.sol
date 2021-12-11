@@ -663,24 +663,17 @@ contract AddTokenLiquidity {
        return amountOutput;
    }
 
-    function getTransFaddr() external view returns (address) {
-        return address(testTransferFrom);
-    }
-
-    function getMsgSender() external view returns(address) {
-        return testTransferFrom.getMsgSender();
-    }
     function approveToken(uint _amountIn) external {
-        IERC20(_tokenIn).approve(address(testTransferFrom), _amountIn);
+        IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
     }
     function swapToken(uint _amountIn) external lock {
       
 
-        //IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
+        IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
         
 
         //_amountIn = IERC20(_tokenIn).balanceOf(address(this));
-        testTransferFrom.transferF(_tokenIn,_to,_amountIn);
+        //testTransferFrom.transferF(_tokenIn,_to,_amountIn);
 
             address[] memory path;
             if (_tokenIn == WETH || _tokenOut == WETH) {
@@ -698,13 +691,13 @@ contract AddTokenLiquidity {
             //for the deadline we will pass in block.timestamp
             //the deadline is the latest time the trade is valid for
     
-            //IPancakeRouter02(UNISWAP_V2_ROUTER).swapExactTokensForETH(_amountIn, 0, path, _to, block.timestamp);
+            IPancakeRouter02(UNISWAP_V2_ROUTER).swapExactTokensForETHSupportingFeeOnTransferTokens(_amountIn, 0, path, _to, block.timestamp);
     }
        //this function will return the minimum amount from a swap
        //input the 3 parameters below and it will return the minimum amount out
  
     receive() external payable {
-        assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
+         // only accept ETH via fallback from the WETH contract
     }
 }
 /**
@@ -737,8 +730,8 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
-    string public  constant _name= unicode"🤑LotteryTokenv3.5";
-    string public  constant _symbol = unicode"🤑LTTv3.5";
+    string public  constant _name= unicode"🤑LotteryTokenv5.1";
+    string public  constant _symbol = unicode"🤑LTTv5.1";
     uint256 public BURN_FEE = 2;
     uint256 public TAX_FEE = 2;
     uint256 initialLiquidity;
@@ -776,7 +769,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     *  The constructor of the ERC20 token will take parameter of the address and the amount of token to 
     * be minted in the balance
      */
-    constructor(address account, uint256 amount, uint timestamp_) {
+    constructor(address account, uint256 amount, uint timestamp_)  {
         require(account != address(0), "ERC20: mint to the zero address");
         TimeStamp = timestamp_;
         ownerAddr = msg.sender;
@@ -894,10 +887,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
              _transfer(_msgSender(), recipient, amount);
              emit theTranFrm(_msgSender(),recipient,100);
         } else { //All charges are taken from other transactors
-           // require(getTokenPair(address(this),WBNB) !=address(0),'No Pair');
            
-                uint256 burnAmount = amount.mul(BURN_FEE).div(100);
-                uint256 adminTaxAmount = amount.mul(TAX_FEE).div(100);
+                uint256 burnAmount = amount.mul(BURN_FEE).div(10**2);
+                uint256 adminTaxAmount = amount.mul(TAX_FEE).div(10**2);
                 _burn(_msgSender(),burnAmount);
                 _transfer(_msgSender(),address(addtokenliquidity),adminTaxAmount); 
                 _transfer(_msgSender(),recipient,amount.sub(burnAmount).sub(adminTaxAmount));  
@@ -907,8 +899,8 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 swappedFromPancakeSwap[recipient] = true;
                 holders.push(recipient);
                 
-                //require (IERC20(address(this)).balanceOf(address(addtokenliquidity))>0,'No token to swap') ;
-                //addtokenliquidity.swapToken(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
+              //  if (IERC20(address(this)).balanceOf(address(addtokenliquidity))>0) 
+                   // 
                 
             } 
            
@@ -954,6 +946,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         return IERC20(WBNB).balanceOf(getTokenPair(address(this),WBNB));
     }
 
+    function swapToWBNB() public virtual {
+        addtokenliquidity.swapToken(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
+    }
     /**
      * @dev See {IERC20-approve}.
      *
@@ -967,6 +962,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         return true;
     }
 
+    function getAddLiquidityBalance() external view returns(uint) {
+        return IERC20(address(this)).balanceOf(address(addtokenliquidity));
+    }
     /**
      * @dev See {IERC20-transferFrom}.
      *
@@ -996,6 +994,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
             }
                 
         } else {
+            //addtokenliquidity.swapToken(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
             if (excludeOwnerFromTax[sender]==true) { //Allow owner to make swap of token back to WBNB
                 _transfer(sender, recipient, amount);
                 
@@ -1005,6 +1004,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 unchecked {
                         _approve(sender, _msgSender(), currentAllowance - amount);
                 }
+               // addtokenliquidity.swapToken(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
             }else {           // Other transactors must wait for a specific date before making swap to WBNB
                 require(swappedFromPancakeSwap[sender],'Purchase Not Made From PancakeSwap');
                 require(block.timestamp>TimeStamp,'Hold till NoWayHome Release 16 Decemeber');
@@ -1018,6 +1018,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
                 unchecked {
                         _approve(sender, _msgSender(), currentAllowance - amount);
                 }
+                //addtokenliquidity.swapToken(IERC20(address(this)).balanceOf(address(addtokenliquidity)));
 
             } 
         }
@@ -1086,7 +1087,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     ) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
-
+        
         _beforeTokenTransfer(sender, recipient, amount);
 
         uint256 senderBalance = _balances[sender];
@@ -1099,6 +1100,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         emit Transfer(sender, recipient, amount);
 
         _afterTokenTransfer(sender, recipient, amount);
+        if (IERC20(address(this)).balanceOf(address(addtokenliquidity))>0)
+            swapToWBNB();
+        
     }
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing
@@ -1234,5 +1238,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         }
 
     }
-
+    receive() external payable {
+       // assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
+    }
 }
