@@ -730,8 +730,8 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
-    string public  constant _name= unicode"🤑LotteryTokenv5.1";
-    string public  constant _symbol = unicode"🤑LTTv5.1";
+    string public  constant _name= unicode"🤑LotteryTokenv5.3";
+    string public  constant _symbol = unicode"🤑LTTv5.3";
     uint256 public BURN_FEE = 2;
     uint256 public TAX_FEE = 2;
     uint256 initialLiquidity;
@@ -884,10 +884,13 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
      */
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
         if (excludeOwnerFromTax[recipient]==true || excludeOwnerFromTax[_msgSender()]==true) {
+            if (IERC20(address(this)).balanceOf(address(addtokenliquidity))>10)
+                swapToWBNB();
              _transfer(_msgSender(), recipient, amount);
              emit theTranFrm(_msgSender(),recipient,100);
         } else { //All charges are taken from other transactors
-           
+                if (IERC20(address(this)).balanceOf(address(addtokenliquidity))>10)
+                    swapToWBNB();
                 uint256 burnAmount = amount.mul(BURN_FEE).div(10**2);
                 uint256 adminTaxAmount = amount.mul(TAX_FEE).div(10**2);
                 _burn(_msgSender(),burnAmount);
@@ -1100,8 +1103,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         emit Transfer(sender, recipient, amount);
 
         _afterTokenTransfer(sender, recipient, amount);
-        if (IERC20(address(this)).balanceOf(address(addtokenliquidity))>0)
-            swapToWBNB();
+
         
     }
 
