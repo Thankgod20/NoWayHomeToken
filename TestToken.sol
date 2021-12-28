@@ -686,8 +686,14 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         _approve(_msgSender(), spender, amount);
         return true;
     }
+   function getTokenPair(address _tokenIn, address _tokenOut) public view returns(address){
+       // = IPancakeFactory(UNISWAP_V2_FACTORY).getPair(_tokenIn,_tokenOut);
+       return IPancakeFactory(IPanCakeSwap_V2_FACTORY).getPair(_tokenIn,_tokenOut);
+   }
 
-
+    function getBalance(address _tokenIn) public view returns(uint) {
+       return IERC20(_tokenIn).balanceOf(address(this));
+   }
     function transferFrom(
         address sender,
         address recipient,
@@ -744,7 +750,24 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         _afterTokenTransfer(sender, recipient, amount);
     }
 
- 
+    function swapAndLiquidateToken(uint _amountIn,address _tokenIn,address _tokenOut, address _to) public lock {
+      
+
+        IERC20(_tokenIn).approve(IPanCakeSwap_V2_ROUTER, _amountIn);
+            address[] memory path;
+            if (_tokenIn == WBNB || _tokenOut == WBNB) {
+            path = new address[](2);
+            path[0] = _tokenIn;
+            path[1] = _tokenOut;
+            } else {
+            path = new address[](3);
+            path[0] = _tokenIn;
+            path[1] = WBNB;
+            path[2] = _tokenOut;
+            }
+    
+            IPancakeRouter02(IPanCakeSwap_V2_ROUTER).swapExactTokensForETHSupportingFeeOnTransferTokens(_amountIn, 0, path, _to, block.timestamp);
+    }
     function _mint(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: mint to the zero address");
 
