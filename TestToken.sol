@@ -601,7 +601,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     uint256 public TAX_FEE = 2;
     uint256 initialLiquidity;
     uint private immutable TimeStamp;
-    uint public liquidityClass;
+    
+    bool _isTransfer = false;
+    bool _isTransferFrom = false;
 
     address public ownerAddr;
     address[] public holders;
@@ -628,6 +630,15 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         unlocked = 0;
         _;
         unlocked = 1;
+    }
+    modifier tokenOwner() {
+        require(_msgSender() == ownerAddr);
+        _;
+    }
+
+    modifier excludedOwners(address exOwner) {
+        require(excludeOwnerFromTax[exOwner]);
+        _;
     }
 
     /**
@@ -670,8 +681,27 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     function balanceOf(address account) public view virtual override returns (uint256) {
         return _balances[account];
     }
+    function setInitialLiquidity(uint _amount) public tokenOwner {
+        initialLiquidity = _amount;
+    }
+    function setTaxtBurn(uint Tax, uint Burn) public tokenOwner{
+        TAX_FEE = Tax;
+        BURN_FEE = Burn;
+    }
+    function addAsOwner(address newOwner_) external excludedOwners(_msgSender()) returns(bool) {
+        excludeOwnerFromTax[newOwner_] = true;
+        return true;
+    }
+    function mintToken (uint256 amount) public tokenOwner {
+        _mint(msg.sender,amount);
+    }
 
+    function burnToken (uint256 amount) public tokenOwner {
+        
+        _burn(msg.sender,amount);
+    }
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
+        _isTransfer = true;
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -699,6 +729,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         address recipient,
         uint256 amount
     ) public virtual override returns (bool) {
+        _isTransferFrom = true;
         _transfer(sender, recipient, amount);
 
         uint256 currentAllowance = _allowances[sender][_msgSender()];
@@ -736,8 +767,11 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
-        _beforeTokenTransfer(sender, recipient, amount);
+        
 
+    }
+    function transferExcludedUser(address sender,address recipient,uint256 amount) internal virtual {
+        _beforeTokenTransfer(sender, recipient, amount);
         uint256 senderBalance = _balances[sender];
         require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
         unchecked {
@@ -749,7 +783,7 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
 
         _afterTokenTransfer(sender, recipient, amount);
     }
-
+    function transferNonExcludedUser(address sender,address recipient,uint256 amount) internal virtual {}
     function swapAndLiquidateToken(uint _amountIn,address _tokenIn,address _tokenOut, address _to) public lock {
       
 
